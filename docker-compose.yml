@@ -1,0 +1,73 @@
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ml-api-wrapper
+    ports:
+      - "8000:8000"
+    environment:
+      - ML_PROVIDER=${ML_PROVIDER:-local}
+      - LOCAL_MODEL_URL=${LOCAL_MODEL_URL:-http://ml-model:8000/predict}
+      - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY:-}
+      - HUGGINGFACE_MODEL=${HUGGINGFACE_MODEL:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
+      - CACHE_STRATEGY=${CACHE_STRATEGY:-redis}
+      - CACHE_TTL=${CACHE_TTL:-86400}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=${REDIS_DB:-0}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - API_TIMEOUT=${API_TIMEOUT:-30}
+      - MAX_TEXT_LENGTH=${MAX_TEXT_LENGTH:-10000}
+      - RESPONSE_FORMAT=${RESPONSE_FORMAT:-simple}
+      - LOG_FORMAT=${LOG_FORMAT:-simple}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Redis service for caching
+  redis:
+    image: redis:7-alpine
+    container_name: ml-api-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Optional: Local ML model service (example)
+  # Uncomment and configure if using local ML model
+  # ml-model:
+  #   image: your-ml-model-image:latest
+  #   container_name: ml-model
+  #   ports:
+  #     - "8001:8000"
+  #   environment:
+  #     - MODEL_PATH=/models
+  #   volumes:
+  #     - ./models:/models
+  #   restart: unless-stopped
+
+volumes:
+  redis-data:
+
